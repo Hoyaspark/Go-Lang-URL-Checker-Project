@@ -6,13 +6,21 @@ import (
 	"net/http"
 )
 
+type result struct {
+	url    string
+	status string
+}
+
 var (
 	errRequestFailed error = errors.New("request failed")
 )
 
-func main() {
+func (r result) String() string {
+	return fmt.Sprintf("%s : %s", r.url, r.status)
+}
 
-	results := make(map[string]string)
+func main() {
+	maps := make(map[string]string)
 	urls := []string{
 		"https://www.airbnb.com/",
 		"https://www.google.com/",
@@ -24,28 +32,27 @@ func main() {
 		"https://academy.nomadcoders.co/",
 	}
 
+	results := make(chan result)
 	for _, value := range urls {
-		err := hitURL(value)
-		result := "OK"
-		if err != nil {
-			result = "Failed"
-		}
-
-		results[value] = result
+		go hitURL(value, results)
 	}
 
-	for url, result := range results {
-		fmt.Println(url, result)
+	for range urls {
+		re := <-results
+		maps[re.url] = re.status
+	}
+
+	for url, status := range maps {
+		fmt.Println(url, status)
 	}
 }
 
-func hitURL(url string) error {
-	fmt.Println("Checking : ", url)
+// chan<- is Send Only
+func hitURL(url string, c chan<- result) {
 	resp, err := http.Get(url)
 
 	if err != nil || resp.StatusCode >= 400 {
-		return errRequestFailed
+		c <- result{url: url, status: "Failed"}
 	}
-
-	return nil
+	c <- result{url: url, status: "OK"}
 }
